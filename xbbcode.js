@@ -39,6 +39,7 @@ var XBBCODE = (function() {
 
     var me = {},
         urlPattern = /^(?:https?|file|c):(?:\/{1,3}|\\{1})[-a-zA-Z0-9:@#%&()~_?\+=\/\\\.]*$/,
+        emailPattern = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/,
         colorNamePattern = /^(?:red|green|blue|orange|yellow|black|white|brown|gray|silver|purple|maroon|fushsia|lime|olive|navy|teal|aqua)$/,
         colorCodePattern = /^#?[a-fA-F0-9]{6}$/,
         tags,
@@ -153,15 +154,41 @@ var XBBCODE = (function() {
         },
         "img": {
             openTag: function(params,content) {
-            
+                var width = false;
+                var height = false;
+
+                if(typeof params != "undefined") {
+                    var fixed = params.substr(1).match(/(([0-9]+)x([0-9]+))/);
+                    if(fixed != null) {
+                        width = fixed[2];
+                        height = fixed[3];
+                    } else {
+                        var attributes = parseParams(params);
+                        if(typeof attributes["width"] != "undefined") {
+                            width = attributes["width"];
+                        }
+                        if(typeof attributes["height"] != "undefined") {
+                            height = attributes["height"];
+                        }
+                    }
+                }
+
                 var myUrl = content;
                 
                 urlPattern.lastIndex = 0;
                 if ( !urlPattern.test( myUrl ) ) {
                     myUrl = "";
                 }
-            
-                return '<img src="' + myUrl + '" />';
+
+                // return '<img src="' + myUrl + '" />';
+                var bbcodeHtml = '<img border="0" src="' + myUrl + '" ' + (width != false ? 'width="' + width + '"' : '') + ' ' + (height != false ? 'height="' + height + '"' : '') +' />';
+
+                // Link to original image, if width OR height was changed
+                if(width != false || height != false) {
+                    bbcodeHtml = '<a href="'+myUrl+'" target="_blank">' + bbcodeHtml + '</a>';
+                }
+
+                return bbcodeHtml;
             },
             closeTag: function(params,content) {
                 return '';
@@ -302,26 +329,79 @@ var XBBCODE = (function() {
         },
         "url": {
             openTag: function(params,content) {
-            
+
                 var myUrl;
-            
+
                 if (!params) {
                     myUrl = content.replace(/<.*?>/g,"");
                 } else {
                     myUrl = params.substr(1);
                 }
-                
+
                 urlPattern.lastIndex = 0;
                 if ( !urlPattern.test( myUrl ) ) {
                     myUrl = "#";
                 }
-            
+
                 return '<a href="' + myUrl + '">';
             },
             closeTag: function(params,content) {
                 return '</a>';
             }
         },
+        "email": {
+            openTag: function(params,content) {
+
+                var myUrl;
+
+                if (!params) {
+                    myUrl = content.replace(/<.*?>/g,"");
+                } else {
+                    myUrl = params.substr(1);
+                }
+
+                emailPattern.lastIndex = 0;
+                if ( !emailPattern.test( myUrl ) ) {
+                    myUrl = "#";
+                }
+
+                return '<a href="mailto:' + myUrl + '">';
+            },
+            closeTag: function(params,content) {
+                return '</a>';
+            }
+        },
+        "youtube": {
+            openTag: function(params, content) {
+                var width = 425;
+                var height = 344;
+
+                if(typeof params != "undefined") {
+                    var fixed = params.substr(1).match(/(([0-9]+)x([0-9]+))/);
+                    if(fixed != null) {
+                        width = fixed[2];
+                        height = fixed[3];
+                    } else {
+                        var attributes = parseParams(params);
+                        if(typeof attributes["width"] != "undefined") {
+                            width = attributes["width"];
+                        }
+                        if(typeof attributes["height"] != "undefined") {
+                            height = attributes["height"];
+                        }
+                    }
+                }
+
+                var bbcodeHtml = '<object width="' + width + '" height="' + height + '"><param name="movie" value="http://www.youtube.com/v/' + content + '"></param><embed src="http://www.youtube.com/v/' + content + '?fs=1&amp;hl=de_DE&amp;color1=0x5d1719&amp;color2=0xcd311b" type="application/x-shockwave-flash" width="' + width + '" height="' + height + '"></embed></object>';
+
+                return bbcodeHtml;
+            },
+            closeTag: function(params, content) {
+                return "";
+            },
+            displayContent: false
+        },
+
         /*
             The [*] tag is special since the user does not define a closing [/*] tag when writing their bbcode.
             Instead this module parses the code and adds the closing [/*] tag in for them. None of the tags you
@@ -337,7 +417,7 @@ var XBBCODE = (function() {
             restrictParentsTo: ["list"]
         }
     };
-    
+
     // create tag list and lookup fields
     tagList = [];
     (function() {
@@ -354,12 +434,12 @@ var XBBCODE = (function() {
                         tagsNoParseList.push(prop);
                     }
                 }
-                
+
                 tags[prop].validChildLookup = {};
                 tags[prop].validParentLookup = {};
                 tags[prop].restrictParentsTo = tags[prop].restrictParentsTo || [];
                 tags[prop].restrictChildrenTo = tags[prop].restrictChildrenTo || [];
-                
+
                 len = tags[prop].restrictChildrenTo.length;
                 for (ii = 0; ii < len; ii++) {
                     tags[prop].validChildLookup[ tags[prop].restrictChildrenTo[ii] ] = true;
@@ -371,10 +451,10 @@ var XBBCODE = (function() {
             }
         }
     })();
-    
-    bbRegExp = new RegExp("<bbcl=([0-9]+) (" + tagList.join("|") + ")([ =][^>]*?)?>((?:.|[\\r\\n])*?)<bbcl=\\1 /\\2>", "gi"); 
-    pbbRegExp = new RegExp("\\[(" + tagList.join("|") + ")([ =][^\\]]*?)?\\]([^\\[]*?)\\[/\\1\\]", "gi"); 
-    pbbRegExp2 = new RegExp("\\[(" + tagsNoParseList.join("|") + ")([ =][^\\]]*?)?\\]([\\s\\S]*?)\\[/\\1\\]", "gi");    
+
+    bbRegExp = new RegExp("<bbcl=([0-9]+) (" + tagList.join("|") + ")([ =][^>]*?)?>((?:.|[\\r\\n])*?)<bbcl=\\1 /\\2>", "gi");
+    pbbRegExp = new RegExp("\\[(" + tagList.join("|") + ")([ =][^\\]]*?)?\\]([^\\[]*?)\\[/\\1\\]", "gi");
+    pbbRegExp2 = new RegExp("\\[(" + tagsNoParseList.join("|") + ")([ =][^\\]]*?)?\\]([\\s\\S]*?)\\[/\\1\\]", "gi");
 
     // create the regex for escaping ['s that aren't apart of tags
     (function() {
@@ -385,19 +465,19 @@ var XBBCODE = (function() {
             }
         }
 
-        openTags = new RegExp("(\\[)((?:" + tagList.join("|") + ")(?:[ =][^\\]]*?)?)(\\])", "gi"); 
-        closeTags = new RegExp("(\\[)(" + closeTagList.join("|") + ")(\\])", "gi"); 
+        openTags = new RegExp("(\\[)((?:" + tagList.join("|") + ")(?:[ =][^\\]]*?)?)(\\])", "gi");
+        closeTags = new RegExp("(\\[)(" + closeTagList.join("|") + ")(\\])", "gi");
     })();
-    
+
     // -----------------------------------------------------------------------------
     // private functions
     // -----------------------------------------------------------------------------
-    
+
     function checkParentChildRestrictions(parentTag, bbcode, bbcodeLevel, tagName, tagParams, tagContents, errQueue) {
-        
+
         errQueue = errQueue || [];
         bbcodeLevel++;
-        
+
         // get a list of all of the child tags to this tag
         var reTagNames = new RegExp("(<bbcl=" + bbcodeLevel + " )(" + tagList.join("|") + ")([ =>])","gi"),
             reTagNamesParts = new RegExp("(<bbcl=" + bbcodeLevel + " )(" + tagList.join("|") + ")([ =>])","i"),
@@ -407,17 +487,17 @@ var XBBCODE = (function() {
             ii,
             childTag,
             pInfo = tags[parentTag] || {};
-        
+
         reTagNames.lastIndex = 0;
-        
+
         if (!matchingTags) {
             tagContents = "";
         }
-        
+
         for (ii = 0; ii < matchingTags.length; ii++) {
             reTagNamesParts.lastIndex = 0;
             childTag = (matchingTags[ii].match(reTagNamesParts))[2].toLowerCase();
-            
+
             if ( pInfo.restrictChildrenTo.length > 0 ) {
                 if ( !pInfo.validChildLookup[childTag] ) {
                     errStr = "The tag \"" + childTag + "\" is not allowed as a child of the tag \"" + parentTag + "\".";
@@ -431,18 +511,18 @@ var XBBCODE = (function() {
                     errQueue.push(errStr);
                 }
             }
-            
+
         }
-        
+
         tagContents = tagContents.replace(bbRegExp, function(matchStr, bbcodeLevel, tagName, tagParams, tagContents ) {
             errQueue = checkParentChildRestrictions(tagName, matchStr, bbcodeLevel, tagName, tagParams, tagContents, errQueue);
             return matchStr;
         });
         return errQueue;
     }
-    
+
     /*
-        This function updates or adds a piece of metadata to each tag called "bbcl" which 
+        This function updates or adds a piece of metadata to each tag called "bbcl" which
         indicates how deeply nested a particular tag was in the bbcode. This property is removed
         from the HTML code tags at the end of the processing.
     */
@@ -459,35 +539,65 @@ var XBBCODE = (function() {
         });
         return tagContents;
     }
-    
+
     /*
         This function removes the metadata added by the updateTagDepths function
     */
     function unprocess(tagContent) {
         return tagContent.replace(/<bbcl=[0-9]+ \/\*>/gi,"").replace(/<bbcl=[0-9]+ /gi,"&#91;").replace(/>/gi,"&#93;");
     }
-    
+
     var replaceFunct = function(matchStr, bbcodeLevel, tagName, tagParams, tagContents) {
-    
-        tagName = tagName.toLowerCase();
 
         var processedContent = tags[tagName].noParse ? unprocess(tagContents) : tagContents.replace(bbRegExp, replaceFunct),
             openTag = tags[tagName].openTag(tagParams,processedContent),
             closeTag = tags[tagName].closeTag(tagParams,processedContent);
-            
+
         if ( tags[tagName].displayContent === false) {
             processedContent = "";
         }
-        
+
         return openTag + processedContent + closeTag;
     };
 
     function parse(config) {
         var output = config.text;
+
         output = output.replace(bbRegExp, replaceFunct);
+
         return output;
     }
-    
+    function parseParams(tagParameters) {
+        if(tagParameters == null) {
+            return {};
+        }
+
+        var parameters = tagParameters.match(/(\S+)=["']?((?:.(?!["']?\s+(?:\S+)=|[\]"']))+.)["']?/g);
+        var resultParameters = [];
+
+        for(i = 0; i < parameters.length; i++) {
+            // replace html entities, probably exist
+            var value = parameters[i].replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+
+            // split key from value
+            var firstIndex = value.indexOf("=");
+            var paramKey = value.substr(0, firstIndex);
+            var paramValue= value.substr(firstIndex + 1);
+
+            // remove first and last " '
+            if(paramValue.substr(0,1) == "'" || paramValue.substr(0,1) == '"') {
+                paramValue = paramValue.substr(1);
+            }
+
+            if(paramValue.substr(paramValue.length -1) == "'" || paramValue.substr(paramValue.length - 1) == '"') {
+                paramValue = paramValue.substr(0, paramValue.length -1);
+            }
+
+            resultParameters[paramKey] = paramValue;
+        }
+
+        return resultParameters;
+    }
     /*
         The star tag [*] is special in that it does not use a closing tag. Since this parser requires that tags to have a closing
         tag, we must pre-process the input and add in closing tags [/*] for the star tag.
@@ -500,7 +610,7 @@ var XBBCODE = (function() {
         text = text.replace(/\[(?=list([ =][^\]]*)?\]|\/list[\]])/ig, ">");
 
         while (text !== (text = text.replace(/>list([ =][^\]]*)?\]([^>]*?)(>\/list])/gi, function(matchStr,contents,endTag) {
-            
+
             var innerListTxt = matchStr;
             while (innerListTxt !== (innerListTxt = innerListTxt.replace(/\[\*\]([^\[]*?)(\[\*\]|>\/list])/i, function(matchStr,contents,endTag) {
                 if (endTag === ">/list]") {
@@ -511,16 +621,16 @@ var XBBCODE = (function() {
                 var tmp = "<*]" + contents + endTag;
                 return tmp;
             })));
-            
-            innerListTxt = innerListTxt.replace(/>/g, "<");            
+
+            innerListTxt = innerListTxt.replace(/>/g, "<");
             return innerListTxt;
         })));
-        
+
         // add ['s for our tags back in
         text = text.replace(/</g, "[");
         return text;
     };
-    
+
     function addBbcodeLevels(text) {
         while ( text !== (text = text.replace(pbbRegExp, function(matchStr, tagName, tagParams, tagContents) {
             matchStr = matchStr.replace(/\[/g, "<");
@@ -529,26 +639,26 @@ var XBBCODE = (function() {
         })) );
         return text;
     }
-    
+
     // -----------------------------------------------------------------------------
     // public functions
     // -----------------------------------------------------------------------------
-    
+
     me.process = function(config) {
-    
+
         var ret = {html: "", error: false},
             errQueue = [];
 
         config.text = config.text.replace(/</g, "&lt;"); // escape HTML tag brackets
         config.text = config.text.replace(/>/g, "&gt;"); // escape HTML tag brackets
-        
+
         config.text = config.text.replace(openTags, function(matchStr, openB, contents, closeB) {
             return "<" + contents + ">";
         });
         config.text = config.text.replace(closeTags, function(matchStr, openB, contents, closeB) {
             return "<" + contents + ">";
         });
-        
+
         config.text = config.text.replace(/\[/g, "&#91;"); // escape ['s that aren't apart of tags
         config.text = config.text.replace(/\]/g, "&#93;"); // escape ['s that aren't apart of tags
         config.text = config.text.replace(/</g, "["); // escape ['s that aren't apart of tags
@@ -567,13 +677,13 @@ var XBBCODE = (function() {
         config.text = addBbcodeLevels(config.text); // add in level metadata
 
         errQueue = checkParentChildRestrictions("bbcode", config.text, -1, "", "", config.text);
-        
+
         ret.html = parse(config);
 
         if ( ret.html.indexOf("[") !== -1 || ret.html.indexOf("]") !== -1) {
             errQueue.push("Some tags appear to be misaligned.");
         }
-    
+
         if (config.removeMisalignedTags) {
             ret.html = ret.html.replace(/\[.*?\]/g,"");
         }
