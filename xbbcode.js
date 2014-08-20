@@ -38,10 +38,11 @@ var XBBCODE = (function() {
     // -----------------------------------------------------------------------------
 
     var me = {},
-        urlPattern = /^(?:https?|file|c):(?:\/{1,3}|\\{1})[-a-zA-Z0-9:@#%&()~_?\+=\/\\\.]*$/,
-        emailPattern = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/,
+        urlPattern = /^(?:https?|file|c):(?:\/{1,3}|\\{1})[-a-zA-Z0-9:;@#%&()~_?\+=\/\\\.]*$/,
         colorNamePattern = /^(?:red|green|blue|orange|yellow|black|white|brown|gray|silver|purple|maroon|fushsia|lime|olive|navy|teal|aqua)$/,
         colorCodePattern = /^#?[a-fA-F0-9]{6}$/,
+        emailPattern = /[^\s@]+@[^\s@]+\.[^\s@]+/,
+        fontFacePattern = /^([a-z][a-z0-9_]+|"[a-z][a-z0-9_\s]+")$/i,
         tags,
         tagList,
         tagsNoParseList = [],
@@ -50,17 +51,17 @@ var XBBCODE = (function() {
         pbbRegExp2,
         openTags,
         closeTags;
-        
+
     /* -----------------------------------------------------------------------------
      * tags
      * This object contains a list of tags that your code will be able to understand.
      * Each tag object has the following properties:
      *
      *   openTag - A function that takes in the tag's parameters (if any) and its
-     *             contents, and returns what its HTML open tag should be. 
+     *             contents, and returns what its HTML open tag should be.
      *             Example: [color=red]test[/color] would take in "=red" as a
      *             parameter input, and "test" as a content input.
-     *             It should be noted that any BBCode inside of "content" will have 
+     *             It should be noted that any BBCode inside of "content" will have
      *             been processed by the time it enter the openTag function.
      *
      *   closeTag - A function that takes in the tag's parameters (if any) and its
@@ -75,23 +76,23 @@ var XBBCODE = (function() {
      *                        any BBCode tag may be nested within the tag.
      *
      *   restrictParentsTo - A list of BBCode tags which are allowed to be parents of
-     *                       this BBCode tag. If this property is omitted, any BBCode 
+     *                       this BBCode tag. If this property is omitted, any BBCode
      *                       tag may be a parent of the tag.
      *
      *   noParse - true or false. If true, none of the content WITHIN this tag will be
      *             parsed by the XBBCode parser.
-     *       
+     *
      *
      *
      * LIMITIONS on adding NEW TAGS:
      *  - Tag names should be alphanumeric (including underscores) and all tags should have an opening tag
-     *    and a closing tag. 
+     *    and a closing tag.
      *    The [*] tag is an exception because it was already a standard
-     *    bbcode tag. Technecially tags don't *have* to be alphanumeric, but since 
-     *    regular expressions are used to parse the text, if you use a non-alphanumeric 
+     *    bbcode tag. Technecially tags don't *have* to be alphanumeric, but since
+     *    regular expressions are used to parse the text, if you use a non-alphanumeric
      *    tag names, just make sure the tag name gets escaped properly (if needed).
      * --------------------------------------------------------------------------- */
-        
+
     tags = {
         "b": {
             openTag: function(params,content) {
@@ -113,6 +114,15 @@ var XBBCODE = (function() {
                 return '';
             }
         },
+        "center": {
+            openTag: function(params,content) {
+                return '<span class="xbbcode-center">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+
         "code": {
             openTag: function(params,content) {
                 return '<span class="xbbcode-code">';
@@ -124,7 +134,7 @@ var XBBCODE = (function() {
         },
         "color": {
             openTag: function(params,content) {
-            
+
                 var colorCode = params.substr(1) || "black";
                 colorNamePattern.lastIndex = 0;
                 colorCodePattern.lastIndex = 0;
@@ -137,13 +147,66 @@ var XBBCODE = (function() {
                         }
                     }
                 }
-            
+
                 return '<span style="color:' + colorCode + '">';
             },
             closeTag: function(params,content) {
                 return '</span>';
             }
         },
+        "email": {
+            openTag: function(params,content) {
+
+                var myEmail;
+
+                if (!params) {
+                    myEmail = content.replace(/<.*?>/g,"");
+                } else {
+                    myEmail = params.substr(1);
+                }
+
+                emailPattern.lastIndex = 0;
+                if ( !emailPattern.test( myEmail ) ) {
+                    return '<a>';
+                }
+
+                return '<a href="mailto:' + myEmail + '">';
+            },
+            closeTag: function(params,content) {
+                return '</a>';
+            }
+        },
+        "face": {
+            openTag: function(params,content) {
+
+                var faceCode = params.substr(1) || "inherit";
+                fontFacePattern.lastIndex = 0;
+                if ( !fontFacePattern.test( faceCode ) ) {
+                        faceCode = "inherit";
+                }
+                return '<span style="font-family:' + faceCode + '">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+
+
+        "font": {
+            openTag: function(params,content) {
+
+                var faceCode = params.substr(1) || "inherit";
+                fontFacePattern.lastIndex = 0;
+                if ( !fontFacePattern.test( faceCode ) ) {
+                        faceCode = "inherit";
+                }
+                return '<span style="font-family:' + faceCode + '">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+
         "i": {
             openTag: function(params,content) {
                 return '<span class="xbbcode-i">';
@@ -174,13 +237,13 @@ var XBBCODE = (function() {
                 }
 
                 var myUrl = content;
-                
+
                 urlPattern.lastIndex = 0;
                 if ( !urlPattern.test( myUrl ) ) {
                     myUrl = "";
                 }
 
-                // return '<img src="' + myUrl + '" />';
+                //return '<img src="' + myUrl + '" />';
                 var bbcodeHtml = '<img border="0" src="' + myUrl + '" ' + (width != false ? 'width="' + width + '"' : '') + ' ' + (height != false ? 'height="' + height + '"' : '') +' />';
 
                 // Link to original image, if width OR height was changed
@@ -194,6 +257,54 @@ var XBBCODE = (function() {
                 return '';
             },
             displayContent: false
+        },
+        "justify": {
+            openTag: function(params,content) {
+                return '<span class="xbbcode-justify">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+        "large": {
+            openTag: function(params,content) {
+				var params = params || '';
+				var colorCode = params.substr(1) || "inherit";
+                colorNamePattern.lastIndex = 0;
+                colorCodePattern.lastIndex = 0;
+                if ( !colorNamePattern.test( colorCode ) ) {
+                    if ( !colorCodePattern.test( colorCode ) ) {
+                        colorCode = "inherit";
+                    } else {
+                        if (colorCode.substr(0,1) !== "#") {
+                            colorCode = "#" + colorCode;
+                        }
+                    }
+                }
+
+
+                return '<span class="xbbcode-size-36" style="color:' + colorCode + '">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+        "left": {
+            openTag: function(params,content) {
+                return '<span class="xbbcode-left">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+        "li": {
+            openTag: function(params,content) {
+                return "<li>";
+            },
+            closeTag: function(params,content) {
+                return "</li>";
+            },
+            restrictParentsTo: ["list","ul","ol"]
         },
         "list": {
             openTag: function(params,content) {
@@ -213,6 +324,15 @@ var XBBCODE = (function() {
             },
             noParse: true
         },
+        "ol": {
+            openTag: function(params,content) {
+                return '<ol>';
+            },
+            closeTag: function(params,content) {
+                return '</ol>';
+            },
+            restrictChildrenTo: ["*", "li"]
+        },
         "php": {
             openTag: function(params,content) {
                 return '<span class="xbbcode-code">';
@@ -230,6 +350,14 @@ var XBBCODE = (function() {
                 return '</blockquote>';
             }
         },
+        "right": {
+            openTag: function(params,content) {
+                return '<span class="xbbcode-right">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
         "s": {
             openTag: function(params,content) {
                 return '<span class="xbbcode-s">';
@@ -240,18 +368,58 @@ var XBBCODE = (function() {
         },
         "size": {
             openTag: function(params,content) {
-            
+
                 var mySize = parseInt(params.substr(1),10) || 0;
                 if (mySize < 4 || mySize > 40) {
                     mySize = 14;
                 }
-            
+
                 return '<span class="xbbcode-size-' + mySize + '">';
             },
             closeTag: function(params,content) {
                 return '</span>';
             }
         },
+        "small": {
+            openTag: function(params,content) {
+				var params = params || '';
+				var colorCode = params.substr(1) || "inherit";
+                colorNamePattern.lastIndex = 0;
+                colorCodePattern.lastIndex = 0;
+                if ( !colorNamePattern.test( colorCode ) ) {
+                    if ( !colorCodePattern.test( colorCode ) ) {
+                        colorCode = "inherit";
+                    } else {
+                        if (colorCode.substr(0,1) !== "#") {
+                            colorCode = "#" + colorCode;
+                        }
+                    }
+                }
+
+                return '<span class="xbbcode-size-10" style="color:' + colorCode + '">';
+            },
+            closeTag: function(params,content) {
+                return '</span>';
+            }
+        },
+
+        "sub": {
+            openTag: function(params,content) {
+                return '<sub>';
+            },
+            closeTag: function(params,content) {
+                return '</sub>';
+            }
+        },
+        "sup": {
+            openTag: function(params,content) {
+                return '<sup>';
+            },
+            closeTag: function(params,content) {
+                return '</sup>';
+            }
+        },
+
         "table": {
             openTag: function(params,content) {
                 return '<table class="xbbcode-table">';
@@ -327,6 +495,15 @@ var XBBCODE = (function() {
                 return '</span>';
             }
         },
+        "ul": {
+            openTag: function(params,content) {
+                return '<ul>';
+            },
+            closeTag: function(params,content) {
+                return '</ul>';
+            },
+            restrictChildrenTo: ["*", "li"]
+        },
         "url": {
             openTag: function(params,content) {
 
@@ -349,59 +526,6 @@ var XBBCODE = (function() {
                 return '</a>';
             }
         },
-        "email": {
-            openTag: function(params,content) {
-
-                var myUrl;
-
-                if (!params) {
-                    myUrl = content.replace(/<.*?>/g,"");
-                } else {
-                    myUrl = params.substr(1);
-                }
-
-                emailPattern.lastIndex = 0;
-                if ( !emailPattern.test( myUrl ) ) {
-                    myUrl = "#";
-                }
-
-                return '<a href="mailto:' + myUrl + '">';
-            },
-            closeTag: function(params,content) {
-                return '</a>';
-            }
-        },
-        "youtube": {
-            openTag: function(params, content) {
-                var width = 425;
-                var height = 344;
-
-                if(typeof params != "undefined") {
-                    var fixed = params.substr(1).match(/(([0-9]+)x([0-9]+))/);
-                    if(fixed != null) {
-                        width = fixed[2];
-                        height = fixed[3];
-                    } else {
-                        var attributes = parseParams(params);
-                        if(typeof attributes["width"] != "undefined") {
-                            width = attributes["width"];
-                        }
-                        if(typeof attributes["height"] != "undefined") {
-                            height = attributes["height"];
-                        }
-                    }
-                }
-
-                var bbcodeHtml = '<object width="' + width + '" height="' + height + '"><param name="movie" value="http://www.youtube.com/v/' + content + '"></param><embed src="http://www.youtube.com/v/' + content + '?fs=1&amp;hl=de_DE&amp;color1=0x5d1719&amp;color2=0xcd311b" type="application/x-shockwave-flash" width="' + width + '" height="' + height + '"></embed></object>';
-
-                return bbcodeHtml;
-            },
-            closeTag: function(params, content) {
-                return "";
-            },
-            displayContent: false
-        },
-
         /*
             The [*] tag is special since the user does not define a closing [/*] tag when writing their bbcode.
             Instead this module parses the code and adds the closing [/*] tag in for them. None of the tags you
@@ -414,13 +538,13 @@ var XBBCODE = (function() {
             closeTag: function(params,content) {
                 return "</li>";
             },
-            restrictParentsTo: ["list"]
+            restrictParentsTo: ["list","ul","ol"]
         }
     };
 
     // create tag list and lookup fields
-    tagList = [];
-    (function() {
+    function initTags() {
+        tagList = [];
         var prop,
             ii,
             len;
@@ -450,24 +574,26 @@ var XBBCODE = (function() {
                 }
             }
         }
-    })();
 
-    bbRegExp = new RegExp("<bbcl=([0-9]+) (" + tagList.join("|") + ")([ =][^>]*?)?>((?:.|[\\r\\n])*?)<bbcl=\\1 /\\2>", "gi");
-    pbbRegExp = new RegExp("\\[(" + tagList.join("|") + ")([ =][^\\]]*?)?\\]([^\\[]*?)\\[/\\1\\]", "gi");
-    pbbRegExp2 = new RegExp("\\[(" + tagsNoParseList.join("|") + ")([ =][^\\]]*?)?\\]([\\s\\S]*?)\\[/\\1\\]", "gi");
+        bbRegExp = new RegExp("<bbcl=([0-9]+) (" + tagList.join("|") + ")([ =][^>]*?)?>((?:.|[\\r\\n])*?)<bbcl=\\1 /\\2>", "gi");
+        pbbRegExp = new RegExp("\\[(" + tagList.join("|") + ")([ =][^\\]]*?)?\\]([^\\[]*?)\\[/\\1\\]", "gi");
+        pbbRegExp2 = new RegExp("\\[(" + tagsNoParseList.join("|") + ")([ =][^\\]]*?)?\\]([\\s\\S]*?)\\[/\\1\\]", "gi");
 
-    // create the regex for escaping ['s that aren't apart of tags
-    (function() {
-        var closeTagList = [];
-        for (var ii = 0; ii < tagList.length; ii++) {
-            if ( tagList[ii] !== "\\*" ) { // the * tag doesn't have an offical closing tag
-                closeTagList.push ( "/" + tagList[ii] );
+        // create the regex for escaping ['s that aren't apart of tags
+        (function() {
+            var closeTagList = [];
+            for (var ii = 0; ii < tagList.length; ii++) {
+                if ( tagList[ii] !== "\\*" ) { // the * tag doesn't have an offical closing tag
+                    closeTagList.push ( "/" + tagList[ii] );
+                }
             }
-        }
 
-        openTags = new RegExp("(\\[)((?:" + tagList.join("|") + ")(?:[ =][^\\]]*?)?)(\\])", "gi");
-        closeTags = new RegExp("(\\[)(" + closeTagList.join("|") + ")(\\])", "gi");
-    })();
+            openTags = new RegExp("(\\[)((?:" + tagList.join("|") + ")(?:[ =][^\\]]*?)?)(\\])", "gi");
+            closeTags = new RegExp("(\\[)(" + closeTagList.join("|") + ")(\\])", "gi");
+        })();
+
+    };
+    initTags();
 
     // -----------------------------------------------------------------------------
     // private functions
@@ -498,7 +624,7 @@ var XBBCODE = (function() {
             reTagNamesParts.lastIndex = 0;
             childTag = (matchingTags[ii].match(reTagNamesParts))[2].toLowerCase();
 
-            if ( pInfo.restrictChildrenTo.length > 0 ) {
+            if ( pInfo && pInfo.restrictChildrenTo && pInfo.restrictChildrenTo.length > 0 ) {
                 if ( !pInfo.validChildLookup[childTag] ) {
                     errStr = "The tag \"" + childTag + "\" is not allowed as a child of the tag \"" + parentTag + "\".";
                     errQueue.push(errStr);
@@ -549,6 +675,8 @@ var XBBCODE = (function() {
 
     var replaceFunct = function(matchStr, bbcodeLevel, tagName, tagParams, tagContents) {
 
+        tagName = tagName.toLowerCase();
+
         var processedContent = tags[tagName].noParse ? unprocess(tagContents) : tagContents.replace(bbRegExp, replaceFunct),
             openTag = tags[tagName].openTag(tagParams,processedContent),
             closeTag = tags[tagName].closeTag(tagParams,processedContent);
@@ -562,9 +690,7 @@ var XBBCODE = (function() {
 
     function parse(config) {
         var output = config.text;
-
         output = output.replace(bbRegExp, replaceFunct);
-
         return output;
     }
     function parseParams(tagParameters) {
@@ -644,6 +770,20 @@ var XBBCODE = (function() {
     // public functions
     // -----------------------------------------------------------------------------
 
+    // API, Expose all available tags
+    me.tags = function() {
+        return tags;
+    }
+
+    // API
+    me.addTags = function(newtags) {
+        var tag;
+        for (tag in newtags) {
+            tags[tag] = newtags[tag];
+        }
+        initTags();
+    }
+
     me.process = function(config) {
 
         var ret = {html: "", error: false},
@@ -678,7 +818,7 @@ var XBBCODE = (function() {
 
         errQueue = checkParentChildRestrictions("bbcode", config.text, -1, "", "", config.text);
 
-        ret.html = parse(config);
+        ret.html = parse(config);;
 
         if ( ret.html.indexOf("[") !== -1 || ret.html.indexOf("]") !== -1) {
             errQueue.push("Some tags appear to be misaligned.");
@@ -690,15 +830,15 @@ var XBBCODE = (function() {
         if (config.addInLineBreaks) {
             ret.html = '<div style="white-space:pre;">' + ret.html + '</div>';
         }
-    
+
         ret.html = ret.html.replace("&#91;", "["); // put ['s back in
         ret.html = ret.html.replace("&#93;", "]"); // put ['s back in
-        
+
         ret.error = (errQueue.length === 0) ? false : true;
         ret.errorQueue = errQueue;
-        
+
         return ret;
     }
-    
+
     return me;
 })();
