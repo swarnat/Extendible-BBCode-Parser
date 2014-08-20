@@ -29,8 +29,6 @@ THE SOFTWARE.
     to add in your own tags.
 */
 
-"use strict";
-
 var XBBCODE = (function() {
 
     // -----------------------------------------------------------------------------
@@ -526,6 +524,36 @@ var XBBCODE = (function() {
                 return '</a>';
             }
         },
+        "youtube": {
+            openTag: function(params, content) {
+                var width = 425;
+                var height = 344;
+
+                if(typeof params != "undefined") {
+                    var fixed = params.substr(1).match(/(([0-9]+)x([0-9]+))/);
+                    if(fixed != null) {
+                        width = fixed[2];
+                        height = fixed[3];
+                    } else {
+                        var attributes = parseParams(params);
+                        if(typeof attributes["width"] != "undefined") {
+                            width = attributes["width"];
+                        }
+                        if(typeof attributes["height"] != "undefined") {
+                            height = attributes["height"];
+                        }
+                    }
+                }
+
+                var bbcodeHtml = '<object width="' + width + '" height="' + height + '"><param name="movie" value="http://www.youtube.com/v/' + content + '"></param><embed src="http://www.youtube.com/v/' + content + '?fs=1&amp;hl=de_DE&amp;color1=0x5d1719&amp;color2=0xcd311b" type="application/x-shockwave-flash" width="' + width + '" height="' + height + '"></embed></object>';
+
+                return bbcodeHtml;
+            },
+            closeTag: function(params, content) {
+                return "";
+            },
+            displayContent: false
+        },
         /*
             The [*] tag is special since the user does not define a closing [/*] tag when writing their bbcode.
             Instead this module parses the code and adds the closing [/*] tag in for them. None of the tags you
@@ -701,7 +729,7 @@ var XBBCODE = (function() {
         var parameters = tagParameters.match(/(\S+)=["']?((?:.(?!["']?\s+(?:\S+)=|[\]"']))+.)["']?/g);
         var resultParameters = [];
 
-        for(i = 0; i < parameters.length; i++) {
+        for(var i = 0; i < parameters.length; i++) {
             // replace html entities, probably exist
             var value = parameters[i].replace(/&quot;/g, '"').replace(/&#039;/g, "'");
 
@@ -828,7 +856,7 @@ var XBBCODE = (function() {
             ret.html = ret.html.replace(/\[.*?\]/g,"");
         }
         if (config.addInLineBreaks) {
-            ret.html = '<div style="white-space:pre;">' + ret.html + '</div>';
+            ret.html = '<div style="white-space:pre-wrap;">' + ret.html + '</div>';
         }
 
         ret.html = ret.html.replace("&#91;", "["); // put ['s back in
